@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>לימוד אנגלית לילדים / English for Kids</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>🎈 לומדים אנגלית בכיף 🎈</h1>
+            <p>English is Fun!</p>
+        </header>
+
+        <main>
+            <div id="game-area" class="game-area">
+                <div class="card" id="flashcard">
+                    <div class="front">
+                        <span id="hebrew-word">שלום</span>
+                    </div>
+                </div>
+                
+                <div class="controls">
+                    <button id="speak-btn" class="action-btn" aria-label="שמע את המילה">🔊 שמע</button>
+                    <button id="next-btn" class="action-btn primary">המילה הבאה ➡️</button>
+                </div>
+
+                <div class="reveal-area">
+                    <p id="english-word" class="hidden">Hello</p>
+                    <button id="reveal-btn" class="secondary-btn">נחש את המילה!</button>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>נוצר באהבה ללימוד שפות ❤️</p>
+        </footer>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
