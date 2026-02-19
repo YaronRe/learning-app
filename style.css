@@ -1,7 +1,10 @@
 :root {
-    --primary-color: #FF6B6B; /* Soft Red */
-    --secondary-color: #4ECDC4; /* Teal */
-    --accent-color: #FFE66D; /* Yellow */
+    --primary-color: #FF6B6B;
+    /* Soft Red */
+    --secondary-color: #4ECDC4;
+    /* Teal */
+    --accent-color: #FFE66D;
+    /* Yellow */
     --text-color: #2C3E50;
     --bg-color: #F7F9FC;
     --card-bg: #FFFFFF;
@@ -32,7 +35,7 @@ body {
     background: white;
     padding: 2rem;
     border-radius: 20px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
     text-align: center;
     position: relative;
     border: 5px solid var(--secondary-color);
@@ -68,7 +71,7 @@ header p {
 
 .card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
 #hebrew-word {
@@ -159,9 +162,17 @@ footer {
 
 /* Confetti animation for correct answers or fun */
 @keyframes pop {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(1); }
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+
+    100% {
+        transform: scale(1);
+    }
 }
 
 .pop-animation {
@@ -188,7 +199,7 @@ footer {
     padding: 2.5rem;
     border-radius: 20px;
     text-align: center;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     max-width: 90%;
     width: 400px;
     animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -236,7 +247,7 @@ footer {
     padding: 0.8rem 1.5rem;
     border-radius: 50px;
     margin-bottom: 1rem;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
     width: 100%;
     max-width: 600px;
     margin-left: auto;
@@ -252,6 +263,14 @@ footer {
 #current-username {
     color: var(--primary-color);
     font-weight: 700;
+}
+
+#user-points {
+    font-weight: bold;
+    color: #f1c40f;
+    /* Gold */
+    font-size: 1.2rem;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 #logout-btn {
@@ -275,14 +294,98 @@ footer {
     margin-top: 1rem;
     min-height: 1.2em;
     font-weight: 600;
-    color: var(--success-color);
+}
+
+/* Answer Area Styles */
+.answer-area {
+    margin-top: 1.5rem;
+}
+
+.input-container {
+    margin-bottom: 1rem;
+}
+
+#answer-input {
+    width: 100%;
+    padding: 0.8rem;
+    font-size: 1.5rem;
+    text-align: center;
+    border: 3px solid #ddd;
+    border-radius: 15px;
+    font-family: var(--font-english);
+    color: var(--text-color);
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+#answer-input:focus {
+    border-color: var(--secondary-color);
+}
+
+#answer-input.correct {
+    border-color: #2ecc71;
+    background-color: rgba(46, 204, 113, 0.1);
+}
+
+#answer-input.incorrect {
+    border-color: #e74c3c;
+    background-color: rgba(231, 76, 60, 0.1);
+    animation: shake 0.4s ease-in-out;
+}
+
+.action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+#feedback-message {
+    font-size: 1.2rem;
+    margin-top: 0.5rem;
+    min-height: 1.5rem;
+}
+
+.success-text {
+    color: #2ecc71;
+}
+
+.error-text {
+    color: #e74c3c;
+}
+
+@keyframes popIn {
+    0% {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes shake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-10px);
+    }
+
+    50% {
+        transform: translateX(10px);
+    }
+
+    75% {
+        transform: translateX(-10px);
+    }
 }
 
 .hidden {
     display: none !important;
-}
-
-@keyframes popIn {
-    0% { transform: scale(0.8); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
 }

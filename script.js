@@ -4,7 +4,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const englishEl = document.getElementById('english-word');
     const speakBtn = document.getElementById('speak-btn');
     const nextBtn = document.getElementById('next-btn');
-    const revealBtn = document.getElementById('reveal-btn');
 
     // User Management DOM Elements
     const loginOverlay = document.getElementById('login-overlay');
@@ -13,10 +12,64 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginMessage = document.getElementById('login-message');
     const userBar = document.getElementById('user-bar');
     const currentUsernameEl = document.getElementById('current-username');
+    const pointsValueEl = document.getElementById('points-value');
     const logoutBtn = document.getElementById('logout-btn');
+
+    // Answer Validation DOM Elements
+    const answerInput = document.getElementById('answer-input');
+    const checkBtn = document.getElementById('check-btn');
+    const giveUpBtn = document.getElementById('give-up-btn');
+    const feedbackMessage = document.getElementById('feedback-message');
+
+    // --- Configuration ---
+    const POINTS_CORRECT = 10;
+    const POINTS_INCORRECT_PENALTY = 2; // Positive value to subtract
 
     // --- State ---
     let currentUser = null;
+    let isWordSolved = false;
+
+    // --- Sound Logic ---
+    const SoundManager = {
+        ctx: null,
+
+        init() {
+            if (!this.ctx) {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        },
+
+        playTone(freq, type, duration, startTime = 0) {
+            this.init();
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime + startTime);
+
+            gain.gain.setValueAtTime(0.1, this.ctx.currentTime + startTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + startTime + duration);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            osc.start(this.ctx.currentTime + startTime);
+            osc.stop(this.ctx.currentTime + startTime + duration);
+        },
+
+        playSuccess() {
+            // High pitched major arpeggio (C5, E5, G5)
+            this.playTone(523.25, 'sine', 0.1, 0);
+            this.playTone(659.25, 'sine', 0.1, 0.1);
+            this.playTone(783.99, 'sine', 0.3, 0.2);
+        },
+
+        playFailure() {
+            // Low pitched descending tritone
+            this.playTone(200, 'sawtooth', 0.2, 0);
+            this.playTone(150, 'sawtooth', 0.4, 0.15);
+        }
+    };
 
     // --- User Management Logic ---
     const UserManager = {
@@ -53,9 +106,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 userKey = username.trim(); // Store original casing
                 users[userKey] = {
                     name: userKey,
-                    currentWordIndex: 0
+                    currentWordIndex: 0,
+                    points: 0
                 };
                 this.saveUsers(users);
+            } else {
+                // Legacy support: Ensure points exist
+                if (typeof users[userKey].points === 'undefined') {
+                    users[userKey].points = 0;
+                    this.saveUsers(users);
+                }
             }
 
             this.saveLastUser(userKey); // Persist session
@@ -66,6 +126,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const users = this.getUsers();
             if (users[username]) {
                 users[username].currentWordIndex = index;
+                this.saveUsers(users);
+            }
+        },
+
+        updatePoints(username, newPoints) {
+            const users = this.getUsers();
+            if (users[username]) {
+                users[username].points = newPoints;
                 this.saveUsers(users);
             }
         },
@@ -92,6 +160,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update UI
         currentUsernameEl.textContent = currentUser.name;
+        updatePointsDisplay();
+
         loginOverlay.classList.add('hidden');
         userBar.classList.remove('hidden');
 
@@ -102,6 +172,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         loadWord(currentUser.currentWordIndex);
+
+        // Initialize sound context on user interaction (login/load)
+        SoundManager.init();
+    }
+
+    function updatePointsDisplay() {
+        if (currentUser) {
+            pointsValueEl.textContent = currentUser.points;
+        }
     }
 
     function loadWord(index) {
@@ -110,9 +189,21 @@ document.addEventListener('DOMContentLoaded', () => {
         englishEl.innerText = word.english;
 
         // Reset state
+        isWordSolved = false;
         englishEl.classList.remove('visible');
         englishEl.classList.add('hidden');
-        revealBtn.style.display = 'inline-block';
+
+        answerInput.value = '';
+        answerInput.disabled = false;
+        answerInput.classList.remove('correct', 'incorrect');
+        answerInput.focus();
+
+        feedbackMessage.textContent = '';
+        feedbackMessage.className = 'message'; // Reset classes
+
+        checkBtn.classList.remove('hidden');
+        giveUpBtn.classList.remove('hidden');
+        nextBtn.classList.add('hidden');
     }
 
     function speakEnglish() {
@@ -123,17 +214,101 @@ document.addEventListener('DOMContentLoaded', () => {
         speechSynthesis.speak(utterance);
     }
 
-    function revealAnswer() {
-        if (!currentUser) return;
+    function checkAnswer() {
+        if (!currentUser || isWordSolved) return;
 
+        // Initialize sound on check to ensure context is resumed if suspended
+        SoundManager.init();
+
+        const userAnswer = answerInput.value.trim().toLowerCase();
+        const correctAnswer = wordsData[currentUser.currentWordIndex].english.toLowerCase();
+
+        if (userAnswer === correctAnswer) {
+            // Correct!
+            handleCorrectAnswer();
+        } else {
+            // Incorrect
+            handleIncorrectAnswer();
+        }
+    }
+
+    function handleCorrectAnswer() {
+        isWordSolved = true;
+
+        // Sound
+        SoundManager.playSuccess();
+
+        // Update points
+        currentUser.points += POINTS_CORRECT;
+        UserManager.updatePoints(currentUser.name, currentUser.points);
+        updatePointsDisplay();
+
+        // UI Updates
+        answerInput.classList.add('correct');
+        answerInput.classList.remove('incorrect');
+        answerInput.disabled = true;
+
+        feedbackMessage.textContent = "מצוין! / Excellent!";
+        feedbackMessage.classList.add('success-text');
+
+        // DO NOT REVEAL word on correct answer as requested
+        // englishEl.classList.remove('hidden');
+        // englishEl.classList.add('visible');
+
+        checkBtn.classList.add('hidden');
+        giveUpBtn.classList.add('hidden');
+        nextBtn.classList.remove('hidden');
+        nextBtn.focus();
+
+        // Fun effects
+        const card = document.querySelector('.card');
+        card.classList.add('pop-animation');
+        setTimeout(() => card.classList.remove('pop-animation'), 300);
+
+        // DO NOT SPEAK on correct answer as requested
+        // speakEnglish();
+    }
+
+    function handleIncorrectAnswer() {
+        // Sound
+        SoundManager.playFailure();
+
+        // Penalty points
+        if (currentUser.points > 0) {
+            currentUser.points = Math.max(0, currentUser.points - POINTS_INCORRECT_PENALTY);
+            UserManager.updatePoints(currentUser.name, currentUser.points);
+            updatePointsDisplay();
+        }
+
+        // UI Updates
+        answerInput.classList.add('incorrect');
+        setTimeout(() => answerInput.classList.remove('incorrect'), 400); // Remove animation class to re-trigger if needed
+
+        feedbackMessage.textContent = "לא בדיוק, נסה שוב / Not quite, try again";
+        feedbackMessage.classList.add('error-text');
+
+        // Focus back on input
+        answerInput.focus();
+    }
+
+    function giveUp() {
+        if (!currentUser || isWordSolved) return;
+
+        isWordSolved = true;
+
+        // Reveal answer but NO points
         englishEl.classList.remove('hidden');
-        // Small delay to allow display change before opacity transition
-        setTimeout(() => {
-            englishEl.classList.add('visible');
-        }, 10);
-        revealBtn.style.display = 'none';
+        englishEl.classList.add('visible');
 
-        // Auto-speak when revealed
+        answerInput.value = wordsData[currentUser.currentWordIndex].english;
+        answerInput.disabled = true;
+
+        feedbackMessage.textContent = "";
+
+        checkBtn.classList.add('hidden');
+        giveUpBtn.classList.add('hidden');
+        nextBtn.classList.remove('hidden');
+
         speakEnglish();
     }
 
@@ -142,13 +317,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         currentUser.currentWordIndex = (currentUser.currentWordIndex + 1) % wordsData.length;
 
-        // Save progress
+        // Save progress index
         UserManager.updateProgress(currentUser.name, currentUser.currentWordIndex);
-
-        // Create a nice transition
-        const card = document.querySelector('.card');
-        card.classList.add('pop-animation');
-        setTimeout(() => card.classList.remove('pop-animation'), 300);
 
         loadWord(currentUser.currentWordIndex);
     }
@@ -180,13 +350,13 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUser = null;
         userBar.classList.add('hidden');
         loginOverlay.classList.remove('hidden');
-        // Reset game view (optional, creates a clean slate look)
+        // Reset game view
         hebrewEl.innerText = '...';
     }
 
     // --- Event Listeners ---
     speakBtn.addEventListener('click', speakEnglish);
-    revealBtn.addEventListener('click', revealAnswer);
+    // remove revealBtn listener as it's replaced
     nextBtn.addEventListener('click', nextWord);
 
     loginBtn.addEventListener('click', handleLogin);
@@ -196,8 +366,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     logoutBtn.addEventListener('click', handleLogout);
 
-    // Initial state: No user logged in, overlay is visible (default in HTML)
-    // CHECK FOR SAVED SESSION
+    // Answer Validation Listeners
+    checkBtn.addEventListener('click', checkAnswer);
+    giveUpBtn.addEventListener('click', giveUp);
+    answerInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') checkAnswer();
+    });
+
+    // Initial state check
     const lastUser = UserManager.getLastUser();
     if (lastUser) {
         const result = UserManager.login(lastUser);

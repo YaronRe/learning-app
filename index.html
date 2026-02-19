@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>לימוד אנגלית לילדים / English for Kids</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&family=Fredoka:wght@400;600&display=swap"
+        rel="stylesheet">
 </head>
+
 <body>
     <div class="app-container">
         <div id="login-overlay" class="overlay">
@@ -23,6 +26,7 @@
         <header>
             <div id="user-bar" class="hidden">
                 <span id="user-greeting">שלום, <span id="current-username"></span>!</span>
+                <span id="user-points">⭐ <span id="points-value">0</span></span>
                 <button id="logout-btn" class="small-btn">יציאה / Log Out</button>
             </div>
             <h1>🎈 לומדים אנגלית בכיף 🎈</h1>
@@ -36,15 +40,24 @@
                         <span id="hebrew-word">שלום</span>
                     </div>
                 </div>
-                
+
                 <div class="controls">
                     <button id="speak-btn" class="action-btn" aria-label="שמע את המילה">🔊 שמע</button>
-                    <button id="next-btn" class="action-btn primary">המילה הבאה ➡️</button>
+                    <button id="next-btn" class="action-btn primary hidden">המילה הבאה ➡️</button>
                 </div>
 
-                <div class="reveal-area">
+                <div class="answer-area">
+                    <div class="input-container">
+                        <input type="text" id="answer-input" placeholder="Type here..." autocomplete="off">
+                    </div>
+
+                    <div class="action-buttons">
+                        <button id="check-btn" class="action-btn primary">בדיקה / Check</button>
+                        <button id="give-up-btn" class="secondary-btn">גלה לי / Reveal</button>
+                    </div>
+
                     <p id="english-word" class="hidden">Hello</p>
-                    <button id="reveal-btn" class="secondary-btn">נחש את המילה!</button>
+                    <div id="feedback-message" class="message"></div>
                 </div>
             </div>
         </main>
@@ -57,4 +70,5 @@
     <script src="data.js"></script>
     <script src="script.js"></script>
 </body>
+
 </html>
