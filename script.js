@@ -1,11 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Elements ---
-    const hebrewEl = document.getElementById('hebrew-word');
-    const englishEl = document.getElementById('english-word');
+    const promptDisplayEl = document.getElementById('prompt-display');
+    const answerRevealDisplayEl = document.getElementById('answer-reveal-display');
     const speakBtn = document.getElementById('speak-btn');
     const nextBtn = document.getElementById('next-btn');
+    const playAudioPromptBtn = document.getElementById('play-audio-prompt-btn');
 
-    // User Management DOM Elements
+    // Menu & User Management DOM Elements
     const loginOverlay = document.getElementById('login-overlay');
     const usernameInput = document.getElementById('username-input');
     const loginBtn = document.getElementById('login-btn');
@@ -13,7 +14,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const userBar = document.getElementById('user-bar');
     const currentUsernameEl = document.getElementById('current-username');
     const pointsValueEl = document.getElementById('points-value');
+    const userPointsEl = document.getElementById('user-points');
     const logoutBtn = document.getElementById('logout-btn');
+    const currentModeTitleEl = document.getElementById('current-mode-title');
+    
+    // Areas and Navigation
+    const categoryArea = document.getElementById('category-area');
+    const categoryGrid = document.getElementById('category-grid');
+    const selectAllBtn = document.getElementById('select-all-btn');
+    const clearAllBtn = document.getElementById('clear-all-btn');
+    const continueToModesBtn = document.getElementById('continue-to-modes-btn');
+    const categoryErrorMessage = document.getElementById('category-error-message');
+    const backToCategoriesBtn = document.getElementById('back-to-categories-btn');
+
+    const menuArea = document.getElementById('menu-area');
+    const gameArea = document.getElementById('game-area');
+    const backToMenuBtn = document.getElementById('back-to-menu-btn');
+    const modeBtns = document.querySelectorAll('.mode-btn');
 
     // Answer Validation DOM Elements
     const answerInput = document.getElementById('answer-input');
@@ -28,6 +45,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- State ---
     let currentUser = null;
     let isWordSolved = false;
+    let currentQuestionType = null; // 'type1', 'type2', 'type3', 'type4'
+    const MODE_TITLES = {
+        'type1': 'שמע אנגלית, כתוב עברית',
+        'type2': 'קרא אנגלית, כתוב עברית',
+        'type3': 'שמע אנגלית, כתוב אנגלית',
+        'type4': 'קרא עברית, כתוב אנגלית'
+    };
+    
+    // Category State
+    let availableCategories = [];
+    let selectedCategories = new Set();
+    let currentFilteredWords = [];
 
     // --- Sound Logic ---
     const SoundManager = {
@@ -58,14 +87,12 @@ document.addEventListener('DOMContentLoaded', () => {
         },
 
         playSuccess() {
-            // High pitched major arpeggio (C5, E5, G5)
             this.playTone(523.25, 'sine', 0.1, 0);
             this.playTone(659.25, 'sine', 0.1, 0.1);
             this.playTone(783.99, 'sine', 0.3, 0.2);
         },
 
         playFailure() {
-            // Low pitched descending tritone
             this.playTone(200, 'sawtooth', 0.2, 0);
             this.playTone(150, 'sawtooth', 0.4, 0.15);
         }
@@ -96,44 +123,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!normalizedName) return null;
 
-            // Find existing user (case-insensitive check but store display name)
             let userKey = Object.keys(users).find(k => k.toLowerCase() === normalizedName);
             let isNew = false;
 
             if (!userKey) {
                 // Create new user
                 isNew = true;
-                userKey = username.trim(); // Store original casing
+                userKey = username.trim(); 
                 users[userKey] = {
                     name: userKey,
-                    currentWordIndex: 0,
-                    points: 0
+                    scores: { type1: 0, type2: 0, type3: 0, type4: 0 },
+                    progress: { type1: 0, type2: 0, type3: 0, type4: 0 }
                 };
                 this.saveUsers(users);
             } else {
-                // Legacy support: Ensure points exist
-                if (typeof users[userKey].points === 'undefined') {
-                    users[userKey].points = 0;
+                // Legacy support: Migrate old format to new format
+                if (typeof users[userKey].points !== 'undefined' && !users[userKey].scores) {
+                    const legacyPoints = users[userKey].points || 0;
+                    const legacyIndex = users[userKey].currentWordIndex || 0;
+                    users[userKey].scores = { type1: 0, type2: 0, type3: 0, type4: legacyPoints };
+                    users[userKey].progress = { type1: 0, type2: 0, type3: 0, type4: legacyIndex };
+                    delete users[userKey].points;
+                    delete users[userKey].currentWordIndex;
                     this.saveUsers(users);
                 }
             }
 
-            this.saveLastUser(userKey); // Persist session
+            this.saveLastUser(userKey); 
             return { user: users[userKey], isNew };
         },
 
-        updateProgress(username, index) {
+        updateProgress(username, type, index) {
             const users = this.getUsers();
             if (users[username]) {
-                users[username].currentWordIndex = index;
+                users[username].progress[type] = index;
                 this.saveUsers(users);
             }
         },
 
-        updatePoints(username, newPoints) {
+        updatePoints(username, type, newPoints) {
             const users = this.getUsers();
             if (users[username]) {
-                users[username].points = newPoints;
+                users[username].scores[type] = newPoints;
                 this.saveUsers(users);
             }
         },
@@ -143,55 +174,164 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- Game Logic ---
+    // --- Category Logic ---
+    function initCategories() {
+        const categoriesSet = new Set();
+        wordsData.forEach(w => categoriesSet.add(w.category));
+        availableCategories = Array.from(categoriesSet);
+        availableCategories.forEach(cat => selectedCategories.add(cat)); // Select all by default
+        renderCategoryGrid();
+    }
 
-    // Shuffle words on load (we might want to re-shuffle or keep order? 
-    // For now, let's shuffle ONCE globally or just keep the order to make progress meaningful.
-    // If we want "progress" to mean "index in the array", the array order must be constant or saved.
-    // The original code shuffled on load. If I shuffle every time, the index is meaningless for persistence across reloads.
-    // DECISION: To support progress persistence, we should NOT shuffle, or shuffle in a deterministic way (seeded), 
-    // or store the shuffled order. For a kids app, fixed order (or categories) is often better, or simple random pick.
-    // However, the requirement is "save progress". "Progress" usually implies a sequence.
-    // Let's remove the shuffle for now to ensure index is consistent.
-    // shuffleArray(wordsData); // REMOVED for persistence consistency in this simple version
+    function renderCategoryGrid() {
+        categoryGrid.innerHTML = '';
+        availableCategories.forEach(cat => {
+            const btn = document.createElement('button');
+            btn.className = `category-btn ${selectedCategories.has(cat) ? 'selected' : ''}`;
+            btn.textContent = cat;
+            btn.addEventListener('click', () => {
+                 if (selectedCategories.has(cat)) {
+                     selectedCategories.delete(cat);
+                     btn.classList.remove('selected');
+                 } else {
+                     selectedCategories.add(cat);
+                     btn.classList.add('selected');
+                 }
+                 categoryErrorMessage.classList.add('hidden');
+            });
+            categoryGrid.appendChild(btn);
+        });
+    }
+
+    // --- Game Logic ---
 
     function loadGameForUser(user) {
         currentUser = user;
 
         // Update UI
         currentUsernameEl.textContent = currentUser.name;
-        updatePointsDisplay();
-
+        
         loginOverlay.classList.add('hidden');
         userBar.classList.remove('hidden');
-
-        // Restore progress
-        // Ensure index is within bounds (in case wordsData changed)
-        if (currentUser.currentWordIndex >= wordsData.length) {
-            currentUser.currentWordIndex = 0;
+        
+        if (availableCategories.length === 0) {
+            initCategories();
         }
 
-        loadWord(currentUser.currentWordIndex);
+        // Show Categories, not menu or game
+        categoryArea.classList.remove('hidden');
+        menuArea.classList.add('hidden');
+        gameArea.classList.add('hidden');
+        currentModeTitleEl.classList.add('hidden');
+        currentQuestionType = null;
 
-        // Initialize sound context on user interaction (login/load)
+        updatePointsDisplay();
+
+        // Initialize sound context on user interaction
         SoundManager.init();
+    }
+
+    function continueToModes() {
+        if (selectedCategories.size === 0) {
+            categoryErrorMessage.classList.remove('hidden');
+            return;
+        }
+        categoryErrorMessage.classList.add('hidden');
+        
+        // Filter words based on selection
+        currentFilteredWords = wordsData.filter(w => selectedCategories.has(w.category));
+        
+        categoryArea.classList.add('hidden');
+        menuArea.classList.remove('hidden');
+    }
+
+    function backToCategories() {
+        menuArea.classList.add('hidden');
+        categoryArea.classList.remove('hidden');
+    }
+
+    function selectMode(type) {
+        currentQuestionType = type;
+        
+        menuArea.classList.add('hidden');
+        gameArea.classList.remove('hidden');
+        
+        currentModeTitleEl.classList.remove('hidden');
+        currentModeTitleEl.textContent = MODE_TITLES[type];
+        
+        updatePointsDisplay();
+
+        // Ensure index is within bounds (in case wordsData changed)
+        if (currentUser.progress[currentQuestionType] >= currentFilteredWords.length) {
+            currentUser.progress[currentQuestionType] = 0;
+        }
+
+        loadWord(currentUser.progress[currentQuestionType]);
+        SoundManager.init();
+    }
+
+    function backToMenu() {
+        gameArea.classList.add('hidden');
+        menuArea.classList.remove('hidden');
+        currentModeTitleEl.classList.add('hidden');
+        currentQuestionType = null;
+        updatePointsDisplay(); 
     }
 
     function updatePointsDisplay() {
         if (currentUser) {
-            pointsValueEl.textContent = currentUser.points;
+            if (currentQuestionType) {
+                userPointsEl.classList.remove('hidden');
+                pointsValueEl.textContent = currentUser.scores[currentQuestionType];
+            } else {
+                // Menu View: show individual scores, hide total
+                userPointsEl.classList.add('hidden');
+                document.getElementById('score-type1').textContent = currentUser.scores['type1'];
+                document.getElementById('score-type2').textContent = currentUser.scores['type2'];
+                document.getElementById('score-type3').textContent = currentUser.scores['type3'];
+                document.getElementById('score-type4').textContent = currentUser.scores['type4'];
+            }
         }
     }
 
     function loadWord(index) {
-        const word = wordsData[index];
-        hebrewEl.innerText = word.hebrew;
-        englishEl.innerText = word.english;
+        const word = currentFilteredWords[index];
+        
+        // Setup prompt based on mode
+        playAudioPromptBtn.classList.add('hidden');
+        promptDisplayEl.classList.remove('hidden');
+        speakBtn.classList.add('hidden');
+
+        if (currentQuestionType === 'type1' || currentQuestionType === 'type3') {
+            // Audio prompt
+            promptDisplayEl.innerText = 'הקשב! / Listen!';
+            playAudioPromptBtn.classList.remove('hidden');
+            // Auto play audio once shortly after loading
+            setTimeout(() => speakEnglishWord(word.english), 500);
+        } else if (currentQuestionType === 'type2') {
+            // English written prompt
+            promptDisplayEl.innerText = word.english;
+        } else if (currentQuestionType === 'type4') {
+            // Hebrew written prompt
+            promptDisplayEl.innerText = word.hebrew;
+        }
+
+        // Setup the revelation text if they give up
+        answerRevealDisplayEl.innerText = (currentQuestionType === 'type1' || currentQuestionType === 'type2') ? word.hebrew : word.english;
+
+        // Setup input 
+        if (currentQuestionType === 'type1' || currentQuestionType === 'type2') {
+            answerInput.placeholder = "הקלד כאן בכתב...";
+            answerInput.dir = "rtl";
+        } else {
+            answerInput.placeholder = "Type here...";
+            answerInput.dir = "ltr";
+        }
 
         // Reset state
         isWordSolved = false;
-        englishEl.classList.remove('visible');
-        englishEl.classList.add('hidden');
+        answerRevealDisplayEl.classList.remove('visible');
+        answerRevealDisplayEl.classList.add('hidden');
 
         answerInput.value = '';
         answerInput.disabled = false;
@@ -199,48 +339,54 @@ document.addEventListener('DOMContentLoaded', () => {
         answerInput.focus();
 
         feedbackMessage.textContent = '';
-        feedbackMessage.className = 'message'; // Reset classes
+        feedbackMessage.className = 'message'; 
 
         checkBtn.classList.remove('hidden');
         giveUpBtn.classList.remove('hidden');
         nextBtn.classList.add('hidden');
     }
 
-    function speakEnglish() {
-        if (!currentUser) return; // Block interaction if not logged in
-        const word = wordsData[currentUser.currentWordIndex].english;
-        const utterance = new SpeechSynthesisUtterance(word);
+    function speakEnglishWord(text) {
+        if (!currentUser) return;
+        const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'en-US';
         speechSynthesis.speak(utterance);
     }
 
-    function checkAnswer() {
-        if (!currentUser || isWordSolved) return;
+    function speakEnglish() {
+        if (!currentUser || !currentQuestionType) return; 
+        const word = currentFilteredWords[currentUser.progress[currentQuestionType]].english;
+        speakEnglishWord(word);
+    }
 
-        // Initialize sound on check to ensure context is resumed if suspended
+    function checkAnswer() {
+        if (!currentUser || isWordSolved || !currentQuestionType) return;
         SoundManager.init();
 
         const userAnswer = answerInput.value.trim().toLowerCase();
-        const correctAnswer = wordsData[currentUser.currentWordIndex].english.toLowerCase();
+        const word = currentFilteredWords[currentUser.progress[currentQuestionType]];
+        let correctAnswer = '';
+
+        if (currentQuestionType === 'type1' || currentQuestionType === 'type2') {
+            correctAnswer = word.hebrew.trim();
+        } else {
+            correctAnswer = word.english.trim().toLowerCase();
+        }
 
         if (userAnswer === correctAnswer) {
-            // Correct!
             handleCorrectAnswer();
         } else {
-            // Incorrect
             handleIncorrectAnswer();
         }
     }
 
     function handleCorrectAnswer() {
         isWordSolved = true;
-
-        // Sound
         SoundManager.playSuccess();
 
         // Update points
-        currentUser.points += POINTS_CORRECT;
-        UserManager.updatePoints(currentUser.name, currentUser.points);
+        currentUser.scores[currentQuestionType] += POINTS_CORRECT;
+        UserManager.updatePoints(currentUser.name, currentQuestionType, currentUser.scores[currentQuestionType]);
         updatePointsDisplay();
 
         // UI Updates
@@ -251,10 +397,6 @@ document.addEventListener('DOMContentLoaded', () => {
         feedbackMessage.textContent = "מצוין! / Excellent!";
         feedbackMessage.classList.add('success-text');
 
-        // DO NOT REVEAL word on correct answer as requested
-        // englishEl.classList.remove('hidden');
-        // englishEl.classList.add('visible');
-
         checkBtn.classList.add('hidden');
         giveUpBtn.classList.add('hidden');
         nextBtn.classList.remove('hidden');
@@ -264,63 +406,59 @@ document.addEventListener('DOMContentLoaded', () => {
         const card = document.querySelector('.card');
         card.classList.add('pop-animation');
         setTimeout(() => card.classList.remove('pop-animation'), 300);
-
-        // DO NOT SPEAK on correct answer as requested
-        // speakEnglish();
     }
 
     function handleIncorrectAnswer() {
-        // Sound
         SoundManager.playFailure();
 
         // Penalty points
-        if (currentUser.points > 0) {
-            currentUser.points = Math.max(0, currentUser.points - POINTS_INCORRECT_PENALTY);
-            UserManager.updatePoints(currentUser.name, currentUser.points);
+        if (currentUser.scores[currentQuestionType] > 0) {
+            currentUser.scores[currentQuestionType] = Math.max(0, currentUser.scores[currentQuestionType] - POINTS_INCORRECT_PENALTY);
+            UserManager.updatePoints(currentUser.name, currentQuestionType, currentUser.scores[currentQuestionType]);
             updatePointsDisplay();
         }
 
         // UI Updates
         answerInput.classList.add('incorrect');
-        setTimeout(() => answerInput.classList.remove('incorrect'), 400); // Remove animation class to re-trigger if needed
+        setTimeout(() => answerInput.classList.remove('incorrect'), 400); 
 
         feedbackMessage.textContent = "לא בדיוק, נסה שוב / Not quite, try again";
         feedbackMessage.classList.add('error-text');
-
-        // Focus back on input
+        
         answerInput.focus();
     }
 
     function giveUp() {
-        if (!currentUser || isWordSolved) return;
-
+        if (!currentUser || isWordSolved || !currentQuestionType) return;
         isWordSolved = true;
 
-        // Reveal answer but NO points
-        englishEl.classList.remove('hidden');
-        englishEl.classList.add('visible');
+        answerRevealDisplayEl.classList.remove('hidden');
+        answerRevealDisplayEl.classList.add('visible');
 
-        answerInput.value = wordsData[currentUser.currentWordIndex].english;
+        const word = currentFilteredWords[currentUser.progress[currentQuestionType]];
+        
+        if (currentQuestionType === 'type1' || currentQuestionType === 'type2') {
+             answerInput.value = word.hebrew;
+        } else {
+             answerInput.value = word.english;
+             if (currentQuestionType === 'type4') speakEnglishWord(word.english);
+        }
+
         answerInput.disabled = true;
-
         feedbackMessage.textContent = "";
 
         checkBtn.classList.add('hidden');
         giveUpBtn.classList.add('hidden');
         nextBtn.classList.remove('hidden');
-
-        speakEnglish();
     }
 
     function nextWord() {
-        if (!currentUser) return;
+        if (!currentUser || !currentQuestionType) return;
 
-        currentUser.currentWordIndex = (currentUser.currentWordIndex + 1) % wordsData.length;
+        currentUser.progress[currentQuestionType] = (currentUser.progress[currentQuestionType] + 1) % currentFilteredWords.length;
+        UserManager.updateProgress(currentUser.name, currentQuestionType, currentUser.progress[currentQuestionType]);
 
-        // Save progress index
-        UserManager.updateProgress(currentUser.name, currentUser.currentWordIndex);
-
-        loadWord(currentUser.currentWordIndex);
+        loadWord(currentUser.progress[currentQuestionType]);
     }
 
     function handleLogin() {
@@ -337,10 +475,9 @@ document.addEventListener('DOMContentLoaded', () => {
             loginMessage.style.color = "var(--primary-color)";
         }
 
-        // Delay starting game slightly to show message
         setTimeout(() => {
             loadGameForUser(result.user);
-            usernameInput.value = ''; // Clear input
+            usernameInput.value = ''; 
             loginMessage.textContent = '';
         }, 1000);
     }
@@ -348,16 +485,43 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleLogout() {
         UserManager.logout();
         currentUser = null;
+        currentQuestionType = null;
+        
         userBar.classList.add('hidden');
+        categoryArea.classList.add('hidden');
+        menuArea.classList.add('hidden');
+        gameArea.classList.add('hidden');
         loginOverlay.classList.remove('hidden');
-        // Reset game view
-        hebrewEl.innerText = '...';
+        
+        promptDisplayEl.innerText = '...';
     }
 
     // --- Event Listeners ---
     speakBtn.addEventListener('click', speakEnglish);
-    // remove revealBtn listener as it's replaced
+    playAudioPromptBtn.addEventListener('click', speakEnglish);
     nextBtn.addEventListener('click', nextWord);
+
+    selectAllBtn.addEventListener('click', () => {
+        availableCategories.forEach(cat => selectedCategories.add(cat));
+        renderCategoryGrid();
+        categoryErrorMessage.classList.add('hidden');
+    });
+
+    clearAllBtn.addEventListener('click', () => {
+        selectedCategories.clear();
+        renderCategoryGrid();
+    });
+
+    continueToModesBtn.addEventListener('click', continueToModes);
+    backToCategoriesBtn.addEventListener('click', backToCategories);
+
+    modeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            selectMode(btn.dataset.mode);
+        });
+    });
+    
+    backToMenuBtn.addEventListener('click', backToMenu);
 
     loginBtn.addEventListener('click', handleLogin);
     usernameInput.addEventListener('keypress', (e) => {

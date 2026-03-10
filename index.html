@@ -26,6 +26,7 @@
         <header>
             <div id="user-bar" class="hidden">
                 <span id="user-greeting">שלום, <span id="current-username"></span>!</span>
+                <span id="current-mode-title" class="hidden"></span>
                 <span id="user-points">⭐ <span id="points-value">0</span></span>
                 <button id="logout-btn" class="small-btn">יציאה / Log Out</button>
             </div>
@@ -34,10 +35,58 @@
         </header>
 
         <main>
-            <div id="game-area" class="game-area">
+            <div id="category-area" class="menu-area hidden">
+                <h2>בחר קטגוריות / Choose Categories</h2>
+                <div class="category-controls">
+                    <button id="select-all-btn" class="secondary-btn small-btn">בחר הכל / Select All</button>
+                    <button id="clear-all-btn" class="secondary-btn small-btn">נקה הכל / Clear All</button>
+                </div>
+                <div id="category-grid" class="category-grid">
+                    <!-- Categories injected here -->
+                </div>
+                <p id="category-error-message" class="message error-text hidden">אנא בחר לפחות קטגוריה אחת / Please select at least one category</p>
+                <div style="margin-top: 1.5rem;">
+                    <button id="continue-to-modes-btn" class="action-btn primary" style="margin: 0 auto;">המשך / Continue</button>
+                </div>
+            </div>
+
+            <div id="menu-area" class="menu-area hidden">
+                <button id="back-to-categories-btn" class="secondary-btn small-btn">⬅️ חזרה לקטגוריות / Categories</button>
+                <h2>בחר משחק / Choose a Game</h2>
+                <div class="menu-grid">
+                    <button class="menu-btn mode-btn" data-mode="type1">
+                        <span class="mode-icon">🎧➡️✍️🇮🇱</span>
+                        <span class="mode-title-he">שמע אנגלית, כתוב עברית</span>
+                        <span class="mode-title-en">Hear English, Type Hebrew</span>
+                        <span class="mode-score">⭐ <span id="score-type1">0</span></span>
+                    </button>
+                    <button class="menu-btn mode-btn" data-mode="type2">
+                        <span class="mode-icon">📖🇬🇧➡️✍️🇮🇱</span>
+                        <span class="mode-title-he">קרא אנגלית, כתוב עברית</span>
+                        <span class="mode-title-en">Read English, Type Hebrew</span>
+                        <span class="mode-score">⭐ <span id="score-type2">0</span></span>
+                    </button>
+                    <button class="menu-btn mode-btn" data-mode="type3">
+                        <span class="mode-icon">🎧➡️✍️🇬🇧</span>
+                        <span class="mode-title-he">שמע אנגלית, כתוב אנגלית</span>
+                        <span class="mode-title-en">Hear English, Type English</span>
+                        <span class="mode-score">⭐ <span id="score-type3">0</span></span>
+                    </button>
+                    <button class="menu-btn mode-btn" data-mode="type4">
+                        <span class="mode-icon">📖🇮🇱➡️✍️🇬🇧</span>
+                        <span class="mode-title-he">קרא עברית, כתוב אנגלית</span>
+                        <span class="mode-title-en">Read Hebrew, Type English</span>
+                        <span class="mode-score">⭐ <span id="score-type4">0</span></span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="game-area" class="game-area hidden">
+                <button id="back-to-menu-btn" class="secondary-btn small-btn">⬅️ חזרה לתפריט / Back</button>
                 <div class="card" id="flashcard">
                     <div class="front">
-                        <span id="hebrew-word">שלום</span>
+                        <span id="prompt-display">שלום</span>
+                        <button id="play-audio-prompt-btn" class="action-btn hidden" aria-label="שמע את המילה">🔊 שמע / Listen</button>
                     </div>
                 </div>
 
@@ -56,7 +105,7 @@
                         <button id="give-up-btn" class="secondary-btn">גלה לי / Reveal</button>
                     </div>
 
-                    <p id="english-word" class="hidden">Hello</p>
+                    <p id="answer-reveal-display" class="hidden">Hello</p>
                     <div id="feedback-message" class="message"></div>
                 </div>
             </div>
