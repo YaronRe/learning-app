@@ -17,12 +17,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const userPointsEl = document.getElementById('user-points');
     const logoutBtn = document.getElementById('logout-btn');
     const currentModeTitleEl = document.getElementById('current-mode-title');
+    const mainTitleEl = document.getElementById('main-title');
+    const mainSubtitleEl = document.getElementById('main-subtitle');
     
     // Areas and Navigation
     const categoryArea = document.getElementById('category-area');
     const categoryGrid = document.getElementById('category-grid');
-    const selectAllBtn = document.getElementById('select-all-btn');
-    const clearAllBtn = document.getElementById('clear-all-btn');
     const continueToModesBtn = document.getElementById('continue-to-modes-btn');
     const categoryErrorMessage = document.getElementById('category-error-message');
     const backToCategoriesBtn = document.getElementById('back-to-categories-btn');
@@ -194,7 +194,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const categoriesSet = new Set();
         wordsData.forEach(w => categoriesSet.add(w.category));
         availableCategories = Array.from(categoriesSet);
-        availableCategories.forEach(cat => selectedCategories.add(cat)); // Select all by default
+        if (availableCategories.length > 0) {
+            selectedCategories.add(availableCategories[0]); // Select first by default
+        }
         renderCategoryGrid();
     }
 
@@ -205,13 +207,9 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.className = `category-btn ${selectedCategories.has(cat) ? 'selected' : ''}`;
             btn.textContent = cat;
             btn.addEventListener('click', () => {
-                 if (selectedCategories.has(cat)) {
-                     selectedCategories.delete(cat);
-                     btn.classList.remove('selected');
-                 } else {
-                     selectedCategories.add(cat);
-                     btn.classList.add('selected');
-                 }
+                 selectedCategories.clear();
+                 selectedCategories.add(cat);
+                 renderCategoryGrid();
                  categoryErrorMessage.classList.add('hidden');
             });
             categoryGrid.appendChild(btn);
@@ -233,12 +231,14 @@ document.addEventListener('DOMContentLoaded', () => {
             initCategories();
         }
 
-        // Show Categories, not menu or game
         categoryArea.classList.remove('hidden');
         menuArea.classList.add('hidden');
         gameArea.classList.add('hidden');
         currentModeTitleEl.classList.add('hidden');
         currentQuestionType = null;
+
+        mainTitleEl.textContent = "🎈 לומדים אנגלית בכיף 🎈";
+        mainSubtitleEl.classList.remove('hidden');
 
         updatePointsDisplay();
 
@@ -258,11 +258,18 @@ document.addEventListener('DOMContentLoaded', () => {
         
         categoryArea.classList.add('hidden');
         menuArea.classList.remove('hidden');
+
+        const selectedCat = Array.from(selectedCategories)[0];
+        mainTitleEl.textContent = selectedCat;
+        mainSubtitleEl.classList.add('hidden');
     }
 
     function backToCategories() {
         menuArea.classList.add('hidden');
         categoryArea.classList.remove('hidden');
+        
+        mainTitleEl.textContent = "🎈 לומדים אנגלית בכיף 🎈";
+        mainSubtitleEl.classList.remove('hidden');
     }
 
     function selectMode(type) {
@@ -593,23 +600,15 @@ document.addEventListener('DOMContentLoaded', () => {
         loginOverlay.classList.remove('hidden');
         
         promptDisplayEl.innerText = '...';
+        
+        mainTitleEl.textContent = "🎈 לומדים אנגלית בכיף 🎈";
+        mainSubtitleEl.classList.remove('hidden');
     }
 
     // --- Event Listeners ---
     speakBtn.addEventListener('click', speakEnglish);
     playAudioPromptBtn.addEventListener('click', speakEnglish);
     nextBtn.addEventListener('click', nextWord);
-
-    selectAllBtn.addEventListener('click', () => {
-        availableCategories.forEach(cat => selectedCategories.add(cat));
-        renderCategoryGrid();
-        categoryErrorMessage.classList.add('hidden');
-    });
-
-    clearAllBtn.addEventListener('click', () => {
-        selectedCategories.clear();
-        renderCategoryGrid();
-    });
 
     continueToModesBtn.addEventListener('click', continueToModes);
     backToCategoriesBtn.addEventListener('click', backToCategories);
