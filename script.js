@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentUser = null;
     let isWordSolved = false;
     let currentQuestionType = null; // 'type1', 'type2', 'type3', 'type4'
+    let currentWordIndex = 0;
     const MODE_TITLES = {
         'type1': 'שמע אנגלית, כתוב עברית',
         'type2': 'קרא אנגלית, כתוב עברית',
@@ -132,17 +133,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 userKey = username.trim(); 
                 users[userKey] = {
                     name: userKey,
+                    version: 3,
                     scores: { type1: 0, type2: 0, type3: 0, type4: 0 },
-                    progress: { type1: 0, type2: 0, type3: 0, type4: 0 }
+                    wordStats: { type1: {}, type2: {}, type3: {}, type4: {} }
                 };
                 this.saveUsers(users);
             } else {
-                // Legacy support: Migrate old format to new format
-                if (typeof users[userKey].points !== 'undefined' && !users[userKey].scores) {
-                    const legacyPoints = users[userKey].points || 0;
-                    const legacyIndex = users[userKey].currentWordIndex || 0;
-                    users[userKey].scores = { type1: 0, type2: 0, type3: 0, type4: legacyPoints };
-                    users[userKey].progress = { type1: 0, type2: 0, type3: 0, type4: legacyIndex };
+                // Version 3 Migration (Reset old scores)
+                if (users[userKey].version !== 3) {
+                    users[userKey].version = 3;
+                    users[userKey].scores = { type1: 0, type2: 0, type3: 0, type4: 0 };
+                    users[userKey].wordStats = { type1: {}, type2: {}, type3: {}, type4: {} };
+                    delete users[userKey].progress;
                     delete users[userKey].points;
                     delete users[userKey].currentWordIndex;
                     this.saveUsers(users);
@@ -153,11 +155,24 @@ document.addEventListener('DOMContentLoaded', () => {
             return { user: users[userKey], isNew };
         },
 
-        updateProgress(username, type, index) {
+        updateWordStats(username, type, wordId, isCorrect) {
             const users = this.getUsers();
             if (users[username]) {
-                users[username].progress[type] = index;
+                if (!users[username].wordStats[type]) {
+                    users[username].wordStats[type] = {};
+                }
+                const stats = users[username].wordStats[type][wordId] || { history: [] };
+                if (!stats.history) stats.history = [];
+                stats.history.push(isCorrect);
+                if (stats.history.length > 5) {
+                    stats.history.shift();
+                }
+                users[username].wordStats[type][wordId] = stats;
                 this.saveUsers(users);
+                
+                if (currentUser && currentUser.name === username) {
+                    currentUser.wordStats = users[username].wordStats;
+                }
             }
         },
 
@@ -261,12 +276,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         updatePointsDisplay();
 
-        // Ensure index is within bounds (in case wordsData changed)
-        if (currentUser.progress[currentQuestionType] >= currentFilteredWords.length) {
-            currentUser.progress[currentQuestionType] = 0;
-        }
-
-        loadWord(currentUser.progress[currentQuestionType]);
+        currentWordIndex = getNextWordIndex(currentQuestionType);
+        loadWord(currentWordIndex);
         SoundManager.init();
     }
 
@@ -296,7 +307,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function loadWord(index) {
         const word = currentFilteredWords[index];
+        const wordStatsDisplayEl = document.getElementById('word-stats-display');
         
+        // Show success stats
+        if (currentUser && currentUser.wordStats[currentQuestionType]) {
+            const stats = currentUser.wordStats[currentQuestionType][word.english] || { history: [] };
+            const history = stats.history || [];
+            const total = history.length;
+            if (total > 0) {
+                const correctCount = history.filter(h => h).length;
+                const percent = Math.round((correctCount / total) * 100);
+                wordStatsDisplayEl.textContent = `📊 הצלחות (5 אחרונות): ${correctCount}/${total} (${percent}%)`;
+                wordStatsDisplayEl.classList.remove('hidden');
+            } else {
+                wordStatsDisplayEl.textContent = `📊 מילה חדשה / New`;
+                wordStatsDisplayEl.classList.remove('hidden');
+            }
+        } else {
+            if (wordStatsDisplayEl) wordStatsDisplayEl.classList.add('hidden');
+        }
+
         // Setup prompt based on mode
         playAudioPromptBtn.classList.add('hidden');
         promptDisplayEl.classList.remove('hidden');
@@ -355,7 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function speakEnglish() {
         if (!currentUser || !currentQuestionType) return; 
-        const word = currentFilteredWords[currentUser.progress[currentQuestionType]].english;
+        const word = currentFilteredWords[currentWordIndex].english;
         speakEnglishWord(word);
     }
 
@@ -364,7 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
         SoundManager.init();
 
         const userAnswer = answerInput.value.trim().toLowerCase();
-        const word = currentFilteredWords[currentUser.progress[currentQuestionType]];
+        const word = currentFilteredWords[currentWordIndex];
         let correctAnswer = '';
 
         if (currentQuestionType === 'type1' || currentQuestionType === 'type2') {
@@ -383,6 +413,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleCorrectAnswer() {
         isWordSolved = true;
         SoundManager.playSuccess();
+
+        const wordId = currentFilteredWords[currentWordIndex].english;
+        UserManager.updateWordStats(currentUser.name, currentQuestionType, wordId, true);
 
         // Update points
         currentUser.scores[currentQuestionType] += POINTS_CORRECT;
@@ -411,6 +444,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleIncorrectAnswer() {
         SoundManager.playFailure();
 
+        const wordId = currentFilteredWords[currentWordIndex].english;
+        UserManager.updateWordStats(currentUser.name, currentQuestionType, wordId, false);
+
         // Penalty points
         if (currentUser.scores[currentQuestionType] > 0) {
             currentUser.scores[currentQuestionType] = Math.max(0, currentUser.scores[currentQuestionType] - POINTS_INCORRECT_PENALTY);
@@ -418,24 +454,44 @@ document.addEventListener('DOMContentLoaded', () => {
             updatePointsDisplay();
         }
 
-        // UI Updates
-        answerInput.classList.add('incorrect');
-        setTimeout(() => answerInput.classList.remove('incorrect'), 400); 
+        // Reveal Answer
+        isWordSolved = true;
+        answerRevealDisplayEl.classList.remove('hidden');
+        answerRevealDisplayEl.classList.add('visible');
 
-        feedbackMessage.textContent = "לא בדיוק, נסה שוב / Not quite, try again";
-        feedbackMessage.classList.add('error-text');
+        const word = currentFilteredWords[currentWordIndex];
         
-        answerInput.focus();
+        if (currentQuestionType === 'type1' || currentQuestionType === 'type2') {
+             answerInput.value = word.hebrew;
+        } else {
+             answerInput.value = word.english;
+             if (currentQuestionType === 'type4') speakEnglishWord(word.english);
+        }
+
+        answerInput.disabled = true;
+        answerInput.classList.add('incorrect');
+        
+        feedbackMessage.textContent = "טעות, הנה התשובה / Incorrect, here is the answer";
+        feedbackMessage.classList.remove('success-text');
+        feedbackMessage.classList.add('error-text');
+
+        checkBtn.classList.add('hidden');
+        giveUpBtn.classList.add('hidden');
+        nextBtn.classList.remove('hidden');
+        nextBtn.focus();
     }
 
     function giveUp() {
         if (!currentUser || isWordSolved || !currentQuestionType) return;
         isWordSolved = true;
 
+        const wordId = currentFilteredWords[currentWordIndex].english;
+        UserManager.updateWordStats(currentUser.name, currentQuestionType, wordId, false);
+
         answerRevealDisplayEl.classList.remove('hidden');
         answerRevealDisplayEl.classList.add('visible');
 
-        const word = currentFilteredWords[currentUser.progress[currentQuestionType]];
+        const word = currentFilteredWords[currentWordIndex];
         
         if (currentQuestionType === 'type1' || currentQuestionType === 'type2') {
              answerInput.value = word.hebrew;
@@ -452,13 +508,56 @@ document.addEventListener('DOMContentLoaded', () => {
         nextBtn.classList.remove('hidden');
     }
 
+    function getNextWordIndex(type) {
+        if (currentFilteredWords.length === 0) return 0;
+        if (currentFilteredWords.length === 1) return 0;
+
+        let totalWeight = 0;
+        const weights = currentFilteredWords.map((word, index) => {
+            const stats = currentUser.wordStats[type][word.english] || { history: [] };
+            const history = stats.history || [];
+            const total = history.length;
+            
+            let weight = 10; // Base weight for new unseen words
+            
+            if (total > 0) {
+                const correctCount = history.filter(h => h).length;
+                const successRate = correctCount / total; 
+                // Extreme priority for words with low success rates!
+                // 0% success = weight 100
+                // 100% success = weight 1
+                if (successRate === 1) {
+                    weight = 1;
+                } else {
+                    weight = Math.round(100 * (1 - successRate));
+                }
+            }
+            
+            // Decrease probability of exact same word appearing again immediately
+            if (index === currentWordIndex) {
+                weight = 0;
+            }
+
+            totalWeight += weight;
+            return weight;
+        });
+
+        if (totalWeight <= 0) return 0;
+
+        let randomVal = Math.random() * totalWeight;
+        for (let i = 0; i < weights.length; i++) {
+            randomVal -= weights[i];
+            if (randomVal <= 0) {
+                return i;
+            }
+        }
+        return weights.length - 1;
+    }
+
     function nextWord() {
         if (!currentUser || !currentQuestionType) return;
-
-        currentUser.progress[currentQuestionType] = (currentUser.progress[currentQuestionType] + 1) % currentFilteredWords.length;
-        UserManager.updateProgress(currentUser.name, currentQuestionType, currentUser.progress[currentQuestionType]);
-
-        loadWord(currentUser.progress[currentQuestionType]);
+        currentWordIndex = getNextWordIndex(currentQuestionType);
+        loadWord(currentWordIndex);
     }
 
     function handleLogin() {

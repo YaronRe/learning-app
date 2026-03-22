@@ -74,6 +74,19 @@ header p {
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
+.word-stats {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--text-color);
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 4px 10px;
+    border-radius: 12px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
 #prompt-display {
     font-size: 3rem;
     font-weight: bold;

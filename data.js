@@ -1,6 +1,7 @@
 const wordsData = [
     { hebrew: "כלב", english: "Dog", category: "Animals" },
     { hebrew: "חתול", english: "Cat", category: "Animals" },
+    { hebrew: "אריה", english: "Lion", category: "Animals" },
     { hebrew: "בית", english: "House", category: "General" },
     { hebrew: "תפוח", english: "Apple", category: "Food" },
     { hebrew: "שלום", english: "Hello", category: "Greetings" },
