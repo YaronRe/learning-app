@@ -475,6 +475,55 @@ footer {
     animation: shake 0.4s ease-in-out;
 }
 
+.options-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.option-btn {
+    padding: 1rem;
+    font-size: 1.3rem;
+    border: 3px solid #ddd;
+    border-radius: 15px;
+    background: white;
+    cursor: pointer;
+    font-family: var(--font-english);
+    color: var(--text-color);
+    transition: all 0.2s ease;
+}
+
+.option-btn.hebrew-text {
+    font-family: var(--font-hebrew);
+}
+
+.option-btn:hover {
+    border-color: var(--secondary-color);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.option-btn:disabled {
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.option-btn.correct {
+    border-color: #2ecc71;
+    background-color: rgba(46, 204, 113, 0.2);
+    color: #27ae60;
+    font-weight: bold;
+}
+
+.option-btn.incorrect {
+    border-color: #e74c3c;
+    background-color: rgba(231, 76, 60, 0.2);
+    color: #c0392b;
+    animation: shake 0.4s ease-in-out;
+}
+
 .action-buttons {
     display: flex;
     justify-content: center;

@@ -34,6 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Answer Validation DOM Elements
     const answerInput = document.getElementById('answer-input');
+    const textInputContainer = document.getElementById('text-input-container');
+    const optionsContainer = document.getElementById('options-container');
     const checkBtn = document.getElementById('check-btn');
     const giveUpBtn = document.getElementById('give-up-btn');
     const feedbackMessage = document.getElementById('feedback-message');
@@ -51,7 +53,11 @@ document.addEventListener('DOMContentLoaded', () => {
         'type1': 'שמע אנגלית, כתוב עברית',
         'type2': 'קרא אנגלית, כתוב עברית',
         'type3': 'שמע אנגלית, כתוב אנגלית',
-        'type4': 'קרא עברית, כתוב אנגלית'
+        'type4': 'קרא עברית, כתוב אנגלית',
+        'type5': 'שמע אנגלית, בחר עברית',
+        'type6': 'קרא אנגלית, בחר עברית',
+        'type7': 'שמע אנגלית, בחר אנגלית',
+        'type8': 'קרא עברית, בחר אנגלית'
     };
     
     // Category State
@@ -134,19 +140,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 users[userKey] = {
                     name: userKey,
                     version: 3,
-                    scores: { type1: 0, type2: 0, type3: 0, type4: 0 },
-                    wordStats: { type1: {}, type2: {}, type3: {}, type4: {} }
+                    scores: { type1: 0, type2: 0, type3: 0, type4: 0, type5: 0, type6: 0, type7: 0, type8: 0 },
+                    wordStats: { type1: {}, type2: {}, type3: {}, type4: {}, type5: {}, type6: {}, type7: {}, type8: {} }
                 };
                 this.saveUsers(users);
             } else {
                 // Version 3 Migration (Reset old scores)
                 if (users[userKey].version !== 3) {
                     users[userKey].version = 3;
-                    users[userKey].scores = { type1: 0, type2: 0, type3: 0, type4: 0 };
-                    users[userKey].wordStats = { type1: {}, type2: {}, type3: {}, type4: {} };
+                    users[userKey].scores = { type1: 0, type2: 0, type3: 0, type4: 0, type5: 0, type6: 0, type7: 0, type8: 0 };
+                    users[userKey].wordStats = { type1: {}, type2: {}, type3: {}, type4: {}, type5: {}, type6: {}, type7: {}, type8: {} };
                     delete users[userKey].progress;
                     delete users[userKey].points;
                     delete users[userKey].currentWordIndex;
+                    this.saveUsers(users);
+                } else {
+                    // Update for type5-8 without resetting if already v3
+                    for (let i = 5; i <= 8; i++) {
+                        if (users[userKey].scores['type' + i] === undefined) {
+                            users[userKey].scores['type' + i] = 0;
+                            users[userKey].wordStats['type' + i] = {};
+                        }
+                    }
                     this.saveUsers(users);
                 }
             }
@@ -304,10 +319,10 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 // Menu View: show individual scores, hide total
                 userPointsEl.classList.add('hidden');
-                document.getElementById('score-type1').textContent = currentUser.scores['type1'];
-                document.getElementById('score-type2').textContent = currentUser.scores['type2'];
-                document.getElementById('score-type3').textContent = currentUser.scores['type3'];
-                document.getElementById('score-type4').textContent = currentUser.scores['type4'];
+                for (let i = 1; i <= 8; i++) {
+                    const el = document.getElementById('score-type' + i);
+                    if (el) el.textContent = currentUser.scores['type' + i] || 0;
+                }
             }
         }
     }
@@ -339,30 +354,61 @@ document.addEventListener('DOMContentLoaded', () => {
         promptDisplayEl.classList.remove('hidden');
         speakBtn.classList.add('hidden');
 
-        if (currentQuestionType === 'type1' || currentQuestionType === 'type3') {
-            // Audio prompt
+        const isAudioPrompt = ['type1', 'type3', 'type5', 'type7'].includes(currentQuestionType);
+        const isEnglishWrittenPrompt = ['type2', 'type6'].includes(currentQuestionType);
+        const isHebrewWrittenPrompt = ['type4', 'type8'].includes(currentQuestionType);
+        const isHebrewAnswer = ['type1', 'type2', 'type5', 'type6'].includes(currentQuestionType);
+        const isMultipleChoice = ['type5', 'type6', 'type7', 'type8'].includes(currentQuestionType);
+
+        if (isAudioPrompt) {
             promptDisplayEl.innerText = 'הקשב! / Listen!';
             playAudioPromptBtn.classList.remove('hidden');
-            // Auto play audio once shortly after loading
             setTimeout(() => speakEnglishWord(word.english), 500);
-        } else if (currentQuestionType === 'type2') {
-            // English written prompt
+        } else if (isEnglishWrittenPrompt) {
             promptDisplayEl.innerText = word.english;
-        } else if (currentQuestionType === 'type4') {
-            // Hebrew written prompt
+        } else if (isHebrewWrittenPrompt) {
             promptDisplayEl.innerText = word.hebrew;
         }
 
-        // Setup the revelation text if they give up
-        answerRevealDisplayEl.innerText = (currentQuestionType === 'type1' || currentQuestionType === 'type2') ? word.hebrew : word.english;
+        answerRevealDisplayEl.innerText = isHebrewAnswer ? word.hebrew : word.english;
 
-        // Setup input 
-        if (currentQuestionType === 'type1' || currentQuestionType === 'type2') {
-            answerInput.placeholder = "הקלד כאן בכתב...";
-            answerInput.dir = "rtl";
+        if (isMultipleChoice) {
+            textInputContainer.classList.add('hidden');
+            checkBtn.classList.add('hidden');
+            optionsContainer.classList.remove('hidden');
+            optionsContainer.innerHTML = '';
+            
+            let options = [word];
+            const otherWords = currentFilteredWords.filter(w => w.english !== word.english);
+            const shuffledOthers = otherWords.sort(() => 0.5 - Math.random());
+            const wrongOptions = shuffledOthers.slice(0, 3);
+            options = options.concat(wrongOptions);
+            options.sort(() => 0.5 - Math.random());
+            
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn' + (isHebrewAnswer ? ' hebrew-text' : '');
+                btn.textContent = isHebrewAnswer ? opt.hebrew : opt.english;
+                btn.addEventListener('click', () => handleOptionClick(btn, opt.english === word.english));
+                optionsContainer.appendChild(btn);
+            });
+            
         } else {
-            answerInput.placeholder = "Type here...";
-            answerInput.dir = "ltr";
+            textInputContainer.classList.remove('hidden');
+            checkBtn.classList.remove('hidden');
+            optionsContainer.classList.add('hidden');
+            
+            if (isHebrewAnswer) {
+                answerInput.placeholder = "הקלד כאן בכתב...";
+                answerInput.dir = "rtl";
+            } else {
+                answerInput.placeholder = "Type here...";
+                answerInput.dir = "ltr";
+            }
+            answerInput.value = '';
+            answerInput.disabled = false;
+            answerInput.classList.remove('correct', 'incorrect');
+            answerInput.focus();
         }
 
         // Reset state
@@ -370,17 +416,33 @@ document.addEventListener('DOMContentLoaded', () => {
         answerRevealDisplayEl.classList.remove('visible');
         answerRevealDisplayEl.classList.add('hidden');
 
-        answerInput.value = '';
-        answerInput.disabled = false;
-        answerInput.classList.remove('correct', 'incorrect');
-        answerInput.focus();
-
         feedbackMessage.textContent = '';
         feedbackMessage.className = 'message'; 
 
-        checkBtn.classList.remove('hidden');
         giveUpBtn.classList.remove('hidden');
         nextBtn.classList.add('hidden');
+    }
+
+    function handleOptionClick(clickedBtn, isCorrect) {
+        if (!currentUser || isWordSolved || !currentQuestionType) return;
+        SoundManager.init();
+        
+        const btns = optionsContainer.querySelectorAll('.option-btn');
+        btns.forEach(b => b.disabled = true);
+        
+        if (isCorrect) {
+            clickedBtn.classList.add('correct');
+            handleCorrectAnswer();
+        } else {
+            clickedBtn.classList.add('incorrect');
+            handleIncorrectAnswer();
+            const word = currentFilteredWords[currentWordIndex];
+            const isHebrewAnswer = ['type1', 'type2', 'type5', 'type6'].includes(currentQuestionType);
+            const correctText = isHebrewAnswer ? word.hebrew : word.english;
+            btns.forEach(b => {
+                if (b.textContent === correctText) b.classList.add('correct');
+            });
+        }
     }
 
     function speakEnglishWord(text) {
@@ -492,19 +554,28 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentUser || isWordSolved || !currentQuestionType) return;
         isWordSolved = true;
 
-        const wordId = currentFilteredWords[currentWordIndex].english;
+        const btns = optionsContainer.querySelectorAll('.option-btn');
+        const word = currentFilteredWords[currentWordIndex];
+        const isHebrewAnswer = ['type1', 'type2', 'type5', 'type6'].includes(currentQuestionType);
+        const correctText = isHebrewAnswer ? word.hebrew : word.english;
+        btns.forEach(b => {
+             b.disabled = true;
+             if (b.textContent === correctText) {
+                 b.classList.add('correct');
+             }
+        });
+
+        const wordId = word.english;
         UserManager.updateWordStats(currentUser.name, currentQuestionType, wordId, false);
 
         answerRevealDisplayEl.classList.remove('hidden');
         answerRevealDisplayEl.classList.add('visible');
-
-        const word = currentFilteredWords[currentWordIndex];
         
-        if (currentQuestionType === 'type1' || currentQuestionType === 'type2') {
+        if (isHebrewAnswer) {
              answerInput.value = word.hebrew;
         } else {
              answerInput.value = word.english;
-             if (currentQuestionType === 'type4') speakEnglishWord(word.english);
+             if (currentQuestionType === 'type4' || currentQuestionType === 'type8') speakEnglishWord(word.english);
         }
 
         answerInput.disabled = true;

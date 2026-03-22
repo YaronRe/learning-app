@@ -78,6 +78,30 @@
                         <span class="mode-title-en">Read Hebrew, Type English</span>
                         <span class="mode-score">⭐ <span id="score-type4">0</span></span>
                     </button>
+                    <button class="menu-btn mode-btn" data-mode="type5">
+                        <span class="mode-icon">🎧➡️👆🇮🇱</span>
+                        <span class="mode-title-he">שמע אנגלית, בחר עברית</span>
+                        <span class="mode-title-en">Hear English, Choose Hebrew</span>
+                        <span class="mode-score">⭐ <span id="score-type5">0</span></span>
+                    </button>
+                    <button class="menu-btn mode-btn" data-mode="type6">
+                        <span class="mode-icon">📖🇬🇧➡️👆🇮🇱</span>
+                        <span class="mode-title-he">קרא אנגלית, בחר עברית</span>
+                        <span class="mode-title-en">Read English, Choose Hebrew</span>
+                        <span class="mode-score">⭐ <span id="score-type6">0</span></span>
+                    </button>
+                    <button class="menu-btn mode-btn" data-mode="type7">
+                        <span class="mode-icon">🎧➡️👆🇬🇧</span>
+                        <span class="mode-title-he">שמע אנגלית, בחר אנגלית</span>
+                        <span class="mode-title-en">Hear English, Choose English</span>
+                        <span class="mode-score">⭐ <span id="score-type7">0</span></span>
+                    </button>
+                    <button class="menu-btn mode-btn" data-mode="type8">
+                        <span class="mode-icon">📖🇮🇱➡️👆🇬🇧</span>
+                        <span class="mode-title-he">קרא עברית, בחר אנגלית</span>
+                        <span class="mode-title-en">Read Hebrew, Choose English</span>
+                        <span class="mode-score">⭐ <span id="score-type8">0</span></span>
+                    </button>
                 </div>
             </div>
 
@@ -98,8 +122,12 @@
                 </div>
 
                 <div class="answer-area">
-                    <div class="input-container">
+                    <div class="input-container" id="text-input-container">
                         <input type="text" id="answer-input" placeholder="Type here..." autocomplete="off">
+                    </div>
+
+                    <div id="options-container" class="options-container hidden">
+                        <!-- Options buttons injected here -->
                     </div>
 
                     <div class="action-buttons">
